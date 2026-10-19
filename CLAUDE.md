@@ -24,6 +24,8 @@ uv run pytest -q                                      # offline: synthetic audio
   (source, licence, credit); placements are `Use` rows (item, channel). `Library.check(item)` is the
   publish gate against `licenses.toml`. Never place audio in a published item without a cue.
 - Epidemic: plan is Creator (one channel per platform + one podcast feed, no client work). Licence key
-  `epidemic:<EPIDEMIC_PLAN>`. Download URLs are pre-signed and expire: freeze immediately.
+  `epidemic:<EPIDEMIC_PLAN>`. `epidemic.py` talks to the **MCP service** (JSON-RPC over streamable
+  HTTP; tools return GraphQL JSON) with an account API key; the Partner Content API returns 401 for
+  those keys. Download URLs are pre-signed and expire: freeze immediately.
 - TTS: `voices.toml` voices require `consent`; a non-self clone needs the speaker's recorded consent.
 - httpx clients use `truststore` (work network TLS inspection). Keys in `.env` (gitignored).
