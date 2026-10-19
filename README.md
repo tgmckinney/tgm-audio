@@ -33,10 +33,21 @@ uv run --env-file .env tgm-audio epidemic fetch <trackId> --stems
 uv run --env-file .env tgm-audio voice clone tom samples/*.wav           # → voice_id
 uv run --env-file .env tgm-audio voice say tom "Egg prices fell 4% this month."
 
+uv run tgm-audio report episode.mp3 --target podcast                  # QA; exit 1 on problems
+uv run tgm-audio podcast build examples/episode.toml out/ep.mp3         # see examples/episode.toml
+
 uv run tgm-audio lib ls
 uv run tgm-audio lib use <cue> inflation/short/ap-eggs youtube:@channel
 uv run tgm-audio lib check inflation/short/ap-eggs                       # exit 1 if not cleared
 ```
+
+## Podcasts
+
+An episode TOML lists one pre-mixed recording or one file per speaker, optional intro/outro music
+(library cue or file), chapters (inline or `chapters_file` JSON), cover and tags. `podcast build`:
+high-pass, optional denoise, per-speaker leveling + gentle compression → intro/outro ducked under
+the voice → master −16 LUFS (−19 mono) with 0.5 dB extra true-peak headroom for MP3 → ID3 tags,
+CHAP chapters, embedded cover → QA report.
 
 ## Library
 

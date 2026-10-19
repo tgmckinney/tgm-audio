@@ -1,0 +1,47 @@
+# tgm-audio podcast build examples/episode.toml out/episode.mp3
+title = "15 Questions with a Designer"
+show = "Little Wars FM"
+artist = "Little Wars TV"
+number = 64
+date = "2026-11-01"
+description = "Show notes go here."
+cover = "cover.jpg"          # optional; embedded at ≤1400 px
+mono = false                 # true → -19 LUFS mono master
+bitrate = "128k"
+
+# One pre-mixed recording, or one file per speaker (offset aligns tracks).
+[[tracks]]
+file = "raw/host.wav"
+name = "Greg"
+
+[[tracks]]
+file = "raw/guest.wav"
+name = "Guest"
+offset = 0.0
+
+[clean]
+highpass_hz = 80
+denoise = 0                  # afftdn dB; try 8-12 for a noisy room
+level = true
+compress = true
+
+# source: a tgm-audio library cue id (e.g. an Epidemic fetch) or a file path.
+[intro]
+source = "music/theme.wav"
+seconds = 14                 # plays 10 s alone, then 4 s under the voice
+overlap = 4
+
+[outro]
+source = "music/theme.wav"
+seconds = 20
+overlap = 6
+
+# Voice-timeline times (as in a transcript of the raw recording), or instead:
+# chapters_file = "drafts/episode.json"   # [{start, title}] or {"chapters": [...]}
+[[chapters]]
+start = 0
+title = "Welcome"
+
+[[chapters]]
+start = 95
+title = "Question 1: How did you get into wargaming?"

@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from tgm_audio import epidemic, mix, tts
+from tgm_audio import epidemic, mix, podcast, qa, tts
 from tgm_audio import master as mastering
 from tgm_audio.ledger import Library
 
@@ -13,9 +13,11 @@ app = typer.Typer(
 lib_app = typer.Typer(no_args_is_help=True, help="The library and licence ledger.")
 es_app = typer.Typer(no_args_is_help=True, help="Epidemic Sound.")
 voice_app = typer.Typer(no_args_is_help=True, help="ElevenLabs voices.")
+pod_app = typer.Typer(no_args_is_help=True, help="Podcast episodes.")
 app.add_typer(lib_app, name="lib")
 app.add_typer(es_app, name="epidemic")
 app.add_typer(voice_app, name="voice")
+app.add_typer(pod_app, name="podcast")
 
 Opt = typer.Option
 
@@ -161,3 +163,34 @@ def voice_say(voice: str, text: str, out: Path | None = None):
     if out:
         out.write_bytes(lib.path(c).read_bytes())
     typer.echo(f"{c.id[:12]}  {lib.path(c)}")
+
+
+@app.command()
+def report(
+    files: list[Path],
+    target: Annotated[str, Opt(help=f"One of {', '.join(mastering.TARGETS)}")] = "podcast",
+    json_out: Annotated[bool, Opt("--json", help="One JSON report per line")] = False,
+):
+    """QA: loudness, peaks, long silences; exit 1 if any file has problems."""
+    bad = 0
+    for f in files:
+        r = qa.report(f, target)
+        bad += bool(r.problems)
+        if json_out:
+            typer.echo(r.model_dump_json())
+            continue
+        typer.echo(f"{f.name}: {r.seconds / 60:.1f} min  {r.lufs:.1f} LUFS  {r.true_peak:.1f} dBTP"
+                   f"  LRA {r.lra:.1f}  {r.codec} {r.channels}ch {r.bitrate_kbps or '?'}k")  # fmt: skip
+        for p in r.problems:
+            typer.echo(f"  ✗ {p}")
+    if bad:
+        raise typer.Exit(1)
+
+
+@pod_app.command("build")
+def pod_build(episode: Path, out: Path):
+    """Build an episode TOML into a mastered, tagged, chaptered MP3."""
+    r = podcast.build(podcast.load(episode), out)
+    typer.echo(f"{out}: {r.seconds / 60:.1f} min  {r.lufs:.1f} LUFS  {r.true_peak:.1f} dBTP")
+    for p in r.problems:
+        typer.echo(f"  ✗ {p}")
