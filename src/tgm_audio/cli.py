@@ -117,15 +117,13 @@ def lib_check(item: str):
 @es_app.command("search")
 def es_search(
     term: str | None = None,
-    mood: str | None = None,
-    genre: str | None = None,
     bpm_min: int | None = None,
     bpm_max: int | None = None,
     vocals: bool | None = None,
     limit: int = 10,
 ):
-    for t in epidemic.Epidemic().search(term, mood=mood, genre=genre, bpm_min=bpm_min,
-                                        bpm_max=bpm_max, vocals=vocals, limit=limit):  # fmt: skip
+    es = epidemic.Epidemic()
+    for t in es.search(term, bpm_min=bpm_min, bpm_max=bpm_max, vocals=vocals, limit=limit):
         moods = ",".join(m["name"] for m in t.get("moods", [])[:3])
         typer.echo(
             f"{t['id']}  {t['bpm']:>3} bpm  {t['length'] / 1000:>5.0f}s  {t['title']}  [{moods}]"
