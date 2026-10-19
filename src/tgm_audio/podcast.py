@@ -220,3 +220,51 @@ def build(ep: Episode, out: Path) -> qa.Report:
         master.master(mixed, mastered, t.model_copy(update={"true_peak": t.true_peak - 0.5}))
         encode(ep, mastered, out, tmp)
     return qa.report(out, ep.target)
+
+
+def ab_clips(before: Path, after: Path, out_dir: Path, stem: str, lead: float = 0.0,
+             at: tuple[float, ...] = (0.12, 0.6), seconds: float = 40) -> list[dict]:  # fmt: skip
+    """Matching excerpts of an original and its remaster (stream copy, no re-encode)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    length = ffmpeg.duration(before)
+    clips = []
+    for i, frac in enumerate(at):
+        start = round(max(0.0, min(frac * length, length - seconds)), 1)
+        names = {}
+        for side, src, offset in (("before", before, 0.0), ("after", after, lead)):
+            name = f"{stem}-{i}-{side}{src.suffix}"
+            ffmpeg.run(["-ss", f"{start + offset}", "-t", f"{seconds}", "-i", str(src),
+                        "-map", "0:a", "-c", "copy", str(out_dir / name)])  # fmt: skip
+            names[side] = name
+        clips.append({"start": start, "seconds": seconds, **names})
+    return clips
+
+
+def batch(plans: Path, out: Path, jobs: int = 2, clips: bool = True) -> list[dict]:
+    """Build every plans/*.toml into out/<stem>.mp3 with before/after QA (and A/B clips).
+
+    Writes out/review.json; skips episodes whose output already exists.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    out.mkdir(parents=True, exist_ok=True)
+
+    def one(toml: Path) -> dict:
+        ep = load(toml)
+        dst = out / f"{toml.stem}.mp3"
+        row = {"id": toml.stem, "title": ep.title, "number": ep.number, "date": ep.date,
+               "chapters": len(ep.chapters)}  # fmt: skip
+        try:
+            after = qa.report(dst, ep.target) if dst.exists() else build(ep, dst)
+            row |= {"before": qa.report(ep.tracks[0].file, ep.target).model_dump(),
+                    "after": after.model_dump()}  # fmt: skip
+            if clips and len(ep.tracks) == 1:
+                row["clips"] = ab_clips(ep.tracks[0].file, dst, out / "clips", toml.stem, ep.lead)
+        except Exception as e:  # noqa: BLE001 - one bad episode must not stop the batch
+            row["error"] = str(e)[-1000:]
+        return row
+
+    with ThreadPoolExecutor(jobs) as ex:
+        rows = list(ex.map(one, sorted(plans.glob("*.toml"))))
+    (out / "review.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False))
+    return rows
