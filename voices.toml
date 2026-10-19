@@ -1,0 +1,7 @@
+# Named ElevenLabs voices. voice_ids are not secret. `consent` is required:
+# "self" for your own voice; for anyone else, who consented, when, and where the record is.
+#
+# [voices.tom]
+# voice_id = ""
+# model = "eleven_multilingual_v2"
+# consent = "self"

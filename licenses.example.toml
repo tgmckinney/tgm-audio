@@ -1,0 +1,14 @@
+# Copy to $TGM_AUDIO_LIBRARY/licenses.toml. Keys match Cue.license; channels as used in `lib use`.
+[licenses."epidemic:creator"]
+# Creator plan: one linked channel per platform + one podcast RSS feed; no client/commercial work.
+channels = ["youtube:@your-channel"]
+credit_required = false
+
+[licenses.elevenlabs]
+channels = ["*"]
+
+[licenses.own]
+channels = ["*"]
+
+[licenses.cc0]
+channels = ["*"]

@@ -1,0 +1,32 @@
+[project]
+name = "tgm-audio"
+version = "0.1.0"
+description = "Audio stage for the factory: music sourcing, TTS, mixing, mastering, licence ledger"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.14.1",
+    "static-ffmpeg>=3.0",
+    "truststore>=0.10.5",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+tgm-audio = "tgm_audio.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = ["I"]
