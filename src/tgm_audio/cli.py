@@ -194,3 +194,23 @@ def pod_build(episode: Path, out: Path):
     typer.echo(f"{out}: {r.seconds / 60:.1f} min  {r.lufs:.1f} LUFS  {r.true_peak:.1f} dBTP")
     for p in r.problems:
         typer.echo(f"  ✗ {p}")
+
+
+@pod_app.command("batch")
+def pod_batch(
+    plans: Path,
+    out: Path,
+    jobs: int = 2,
+    clips: Annotated[bool, Opt(help="Cut matching before/after excerpts for review")] = True,
+):
+    """Build every episode TOML in PLANS into OUT, with before/after QA in OUT/review.json."""
+    rows = podcast.batch(plans, out, jobs, clips)
+    for r in rows:
+        if "error" in r:
+            typer.echo(f"✗ {r['id']}: {r['error'][-200:]}")
+            continue
+        b, a = r["before"], r["after"]
+        typer.echo(f"{r['id'][:44]:<44} {b['lufs']:6.1f} → {a['lufs']:6.1f} LUFS"
+                   f"  TP {a['true_peak']:5.1f}  {len(a['problems'])} issues")  # fmt: skip
+    if any("error" in r for r in rows):
+        raise typer.Exit(1)

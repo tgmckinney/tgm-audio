@@ -82,3 +82,21 @@ def test_chapters_file(tmp_path: Path):
     assert [c.title for c in ep.chapters] == ["A", "B"]
     meta = podcast.ffmetadata(ep, 120)
     assert "START=60000" in meta and "END=120000" in meta
+
+
+def test_batch_reports_and_clips(episode: Path, tmp_path: Path):
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    raw = tmp_path / "raw"
+    ffmpeg.run(["-i", str(raw / "host.wav"), "-c:a", "libmp3lame", str(raw / "mix.mp3")])
+    (plans / "ep1.toml").write_text(
+        'title = "One"\nshow = "S"\n[[tracks]]\nfile = "../raw/mix.mp3"\n'
+    )
+    (plans / "bad.toml").write_text('title = "Bad"\nshow = "S"\n[[tracks]]\nfile = "nope.mp3"\n')
+    rows = {r["id"]: r for r in podcast.batch(plans, tmp_path / "out", jobs=2)}
+    assert "error" in rows["bad"]
+    one = rows["ep1"]
+    assert one["after"]["lufs"] == pytest.approx(-16, abs=1) and one["before"]["lufs"] < -20
+    assert [c["start"] for c in one["clips"]] == [0.0, 0.0]  # 20 s file: 40 s clips clamp to 0
+    assert (tmp_path / "out/clips" / one["clips"][0]["after"]).exists()
+    assert json.loads((tmp_path / "out/review.json").read_text())[0]["id"] in rows
