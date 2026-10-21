@@ -8,9 +8,12 @@ Voices are named in `voices.toml` (repo root or $TGM_AUDIO_VOICES):
     consent = "self"
 
 A clone of anyone else needs their recorded consent noted in `consent`; `say()` refuses a voice
-without it. Key: ELEVENLABS_API_KEY.
+without it (a stock library voice: say so, e.g. `consent = "ElevenLabs library voice"`).
+`say(..., timed=True)` also keeps when each character is spoken (`cue.meta["alignment"]`), so a
+video can cut on the narration. Key: ELEVENLABS_API_KEY.
 """
 
+import base64
 import os
 import tempfile
 import tomllib
@@ -70,6 +73,29 @@ class ElevenLabs:
         r.raise_for_status()
         return r.content
 
+    def speak_timed(
+        self, text: str, voice: Voice, fmt: str = "mp3_44100_128"
+    ) -> tuple[bytes, dict[str, list]]:
+        """Audio plus character timing: ``{characters, starts, ends}`` (seconds), as spoken."""
+        r = self.http.post(
+            f"/v1/text-to-speech/{voice.voice_id}/with-timestamps",
+            params={"output_format": fmt},
+            json={
+                "text": text,
+                "model_id": voice.model,
+                "voice_settings": voice.settings.model_dump(),
+            },
+        )
+        r.raise_for_status()
+        body = r.json()
+        a = body["alignment"]
+        timing = {
+            "characters": a["characters"],
+            "starts": a["character_start_times_seconds"],
+            "ends": a["character_end_times_seconds"],
+        }
+        return base64.b64decode(body["audio_base64"]), timing
+
     def clone(self, name: str, samples: list[Path], description: str = "") -> str:
         """Instant voice clone from sample recordings; returns the new voice_id."""
         files = [("files", (p.name, p.read_bytes())) for p in samples]
@@ -84,16 +110,20 @@ class ElevenLabs:
         return r.json()["voices"]
 
 
-def say(lib: Library, el: ElevenLabs, voice_name: str, text: str) -> Cue:
-    """Synthesize `text` in a named voice and freeze it into the library."""
+def say(lib: Library, el: ElevenLabs, voice_name: str, text: str, timed: bool = False) -> Cue:
+    """Synthesize `text` in a named voice and freeze it into the library.
+
+    `timed` keeps the character timing in ``cue.meta["alignment"]`` (see `speak_timed`).
+    """
     voices = load_voices()
     if voice_name not in voices:
         raise KeyError(f"voice {voice_name!r} not in {voices_path()}")
     voice = voices[voice_name]
-    audio = el.speak(text, voice)
+    audio, timing = el.speak_timed(text, voice) if timed else (el.speak(text, voice), None)
     with tempfile.TemporaryDirectory() as tmp:
         f = Path(tmp) / "tts.mp3"
         f.write_bytes(audio)
         return lib.add(f, kind="tts", source="elevenlabs", license="elevenlabs", title=text[:60],
                        source_id=voice.voice_id, note=f"voice={voice_name} model={voice.model}",
-                       meta={"text": text, "characters": len(text)})  # fmt: skip
+                       meta={"text": text, "characters": len(text),
+                             **({"alignment": timing} if timing else {})})  # fmt: skip
