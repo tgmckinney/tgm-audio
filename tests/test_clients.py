@@ -119,3 +119,29 @@ def test_say_requires_configured_voice_with_consent(tmp_path: Path, monkeypatch)
     voices.write_text('[voices.guest]\nvoice_id = "v2"\nconsent = ""\n')
     with pytest.raises(ValueError):
         tts.load_voices()
+
+
+def test_say_timed_keeps_character_alignment(tmp_path: Path, monkeypatch):
+    import base64
+
+    voices = tmp_path / "voices.toml"
+    voices.write_text('[voices.narrator]\nvoice_id = "n1"\nconsent = "ElevenLabs library voice"\n')
+    monkeypatch.setenv("TGM_AUDIO_VOICES", str(voices))
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.path == "/v1/text-to-speech/n1/with-timestamps"
+        return httpx.Response(200, json={
+            "audio_base64": base64.b64encode(b"ID3fake").decode(),
+            "alignment": {"characters": ["H", "i"], "character_start_times_seconds": [0.0, 0.1],
+                          "character_end_times_seconds": [0.1, 0.2]},
+        })  # fmt: skip
+
+    el = tts.ElevenLabs("k", transport=httpx.MockTransport(handler))
+    lib = Library(tmp_path / "lib")
+    cue = tts.say(lib, el, "narrator", "Hi", timed=True)
+    assert lib.path(cue).read_bytes() == b"ID3fake"
+    assert cue.meta["alignment"] == {
+        "characters": ["H", "i"],
+        "starts": [0.0, 0.1],
+        "ends": [0.1, 0.2],
+    }
