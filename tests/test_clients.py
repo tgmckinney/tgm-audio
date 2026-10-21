@@ -145,3 +145,11 @@ def test_say_timed_keeps_character_alignment(tmp_path: Path, monkeypatch):
         "starts": [0.0, 0.1],
         "ends": [0.1, 0.2],
     }
+
+
+def test_credit_falls_back_to_producer_for_traditional_pieces():
+    credits = [{"role": "COMPOSER", "artist": {"name": "Traditional"}},
+               {"role": "PRODUCER", "artist": {"name": "Thommy Andersson"}}]  # fmt: skip
+    assert epidemic._artists(credits) == ["Thommy Andersson"]
+    assert epidemic._artists([{"role": "MAIN_ARTIST", "artist": {"name": "A"}}, *credits]) == ["A"]
+    assert epidemic._artists([{"role": "COMPOSER", "artist": {"name": "Traditional"}}]) == []
