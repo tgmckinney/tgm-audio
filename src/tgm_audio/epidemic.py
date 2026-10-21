@@ -136,13 +136,27 @@ class Epidemic:
         return self.call("DownloadRecordingEdit", {"input": ids})["assetUrl"]
 
 
+#: Who to credit when a recording has no main artist (traditional pieces list only a producer).
+_ROLES = ("MAIN_ARTIST", "PRODUCER", "COMPOSER")
+
+
+def _artists(credits: list[dict]) -> list[str]:
+    """Names in the first role that has any, skipping "Traditional" as a composer."""
+    for role in _ROLES:
+        names = [c["artist"]["name"] for c in credits if c["role"] == role]
+        names = [n for n in names if n.lower() != "traditional"]
+        if names:
+            return names
+    return []
+
+
 def _track(rec: dict) -> dict:
     """Normalize a Recording to a flat dict (id, title, mainArtists, bpm, length ms, moods…)."""
     tags = rec.get("tags", [])
     return {
         "id": rec["id"],
         "title": rec["title"],
-        "mainArtists": [c["artist"]["name"] for c in rec["credits"] if c["role"] == "MAIN_ARTIST"],
+        "mainArtists": _artists(rec["credits"]),
         "bpm": rec.get("bpm"),
         "length": rec["audioFile"]["durationInMilliseconds"],
         "moods": [{"name": t["displayName"]} for t in tags if t["dimension"]["name"] == "mood"],
